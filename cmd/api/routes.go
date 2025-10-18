@@ -1,21 +1,65 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/vickon16/go-gin-rest-api/internal/app"
+	"github.com/vickon16/go-gin-rest-api/internal/utils"
 )
 
-func routes(app *app.Application) http.Handler {
+func (app *application) routes() http.Handler {
 	g := gin.Default()
+
+	// ✅ Custom Recovery Middleware
+	g.Use(gin.Recovery())
+
+	// ✅ CORS Middleware
+	g.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000, https://yourfrontenddomain.com")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	})
+
+	// Centralized error handling
+	g.Use(func(c *gin.Context) {
+		c.Next() // Process request
+
+		if len(c.Errors) > 0 {
+			err := c.Errors.Last().Err
+			code := http.StatusInternalServerError
+			message := err.Error()
+
+			// if it's a Gin error with code, use it
+			if c.Writer.Status() != http.StatusOK {
+				code = c.Writer.Status()
+			}
+
+			// log internal errors
+			if code == http.StatusInternalServerError {
+				log.Printf("Internal Server Error: %v", err)
+			}
+
+			utils.ErrorResponse(c, message, code)
+			c.Abort()
+			return
+		}
+	})
 
 	v1 := g.Group("/api/v1")
 
 	v1.POST("/events")
 
 	// Events
-	routes.SetupEventsRoutes(v1, app)
+	app.setupEventsRoutes(v1)
 
 	return g
 }

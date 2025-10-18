@@ -5,19 +5,17 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/vickon16/go-gin-rest-api/internal/app"
 )
 
-func serve(app *app.Application) error {
+func (app *application) serve() error {
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.Port),
-		Handler:      routes(app),
+		Addr:         fmt.Sprintf(":%d", app.port),
+		Handler:      app.routes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
-	log.Printf("Starting server on port %d", app.Port)
+	log.Printf("Starting server on port %d", app.port)
 	return server.ListenAndServe()
 }
