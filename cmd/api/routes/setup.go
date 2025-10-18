@@ -1,14 +1,15 @@
-package main
+package routes
 
 import (
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vickon16/go-gin-rest-api/internal/app"
 	"github.com/vickon16/go-gin-rest-api/internal/utils"
 )
 
-func (app *application) routes() http.Handler {
+func SetupRoutes(app *app.Application) http.Handler {
 	g := gin.Default()
 
 	// ✅ Custom Recovery Middleware
@@ -56,10 +57,11 @@ func (app *application) routes() http.Handler {
 
 	v1 := g.Group("/api/v1")
 
-	v1.POST("/events")
+	// Auth
+	setupAuthControllers(v1, app)
 
 	// Events
-	app.setupEventsRoutes(v1)
+	setupEventsControllers(v1, app)
 
 	return g
 }

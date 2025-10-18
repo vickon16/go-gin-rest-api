@@ -17,3 +17,11 @@ type Event struct {
 	Date        time.Time `json:"date" binding:"required"`
 	Location    string    `json:"location" binding:"required,min=3"`
 }
+
+type UpdateEventDto struct {
+	UserID      int       `json:"userId"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Date        time.Time `json:"date"`
+	Location    string    `json:"location"`
+}

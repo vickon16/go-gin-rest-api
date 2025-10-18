@@ -12,3 +12,9 @@ type User struct {
 	Name     string `json:"name" binding:"required,min=3"`
 	Password string `json:"-" binding:"required,min=6,max=64"` // hidden in JSON responses
 }
+
+type RegisterUserDto struct {
+	Email    string `json:"email" binding:"required,email"`
+	Name     string `json:"name" binding:"required,min=3"`
+	Password string `json:"password" binding:"required,min=6,max=64"`
+}
