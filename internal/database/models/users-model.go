@@ -18,3 +18,9 @@ type RegisterUserDto struct {
 	Name     string `json:"name" binding:"required,min=3"`
 	Password string `json:"password" binding:"required,min=6,max=64"`
 }
+
+type UpdateUserDto struct {
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
+}
