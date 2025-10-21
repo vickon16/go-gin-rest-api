@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,19 +9,17 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/vickon16/go-gin-rest-api/cmd/api/routes"
 	"github.com/vickon16/go-gin-rest-api/internal/app"
+	"github.com/vickon16/go-gin-rest-api/internal/database"
 	"github.com/vickon16/go-gin-rest-api/internal/database/models"
 	"github.com/vickon16/go-gin-rest-api/internal/env"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 func main() {
 	_ = godotenv.Load()
-	db, err := sql.Open("sqlite3", "./data.db")
-	if err != nil {
-		log.Fatal(err)
-	}
 
+	db := database.SetupDatabase()
 	defer db.Close()
 
 	models := models.NewModels(db)

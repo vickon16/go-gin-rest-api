@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/vickon16/go-gin-rest-api/internal/utils"
@@ -14,26 +15,27 @@ func (m *UserModel) Insert(user *User) error {
 	defer cancel()
 
 	query := sq.Insert("users").
-		Columns("userId", "name", "description", "date", "location").
+		Columns("email", "name", "password").
 		Values(user.Email, user.Name, user.Password).
-		Suffix("RETURNING *").
+		Suffix("RETURNING id, email, name, created_at").
 		PlaceholderFormat(sq.Dollar)
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {
+		log.Printf("Error converting to sql: %v", err)
 		return err
 	}
 
 	// Scan the returned row
 	return m.DB.QueryRowContext(ctx, sqlStr, args...).
-		Scan(&user.ID, &user.Email, &user.Name)
+		Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt)
 }
 
 func (m *UserModel) GetAll() ([]*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
-	query := sq.Select("*").
+	query := sq.Select("id, email, name, created_at").
 		From("users").
 		PlaceholderFormat(sq.Dollar)
 
@@ -55,7 +57,7 @@ func (m *UserModel) GetAll() ([]*User, error) {
 	for rows.Next() {
 		var user User
 
-		if err := rows.Scan(&user.ID, &user.Email, &user.Name); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt); err != nil {
 			return nil, err
 		}
 
@@ -73,7 +75,7 @@ func (m *UserModel) Get(id int) (*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
-	query := sq.Select("*").
+	query := sq.Select("id, email, name, created_at").
 		From("users").
 		Where(sq.Eq{"id": id}).
 		PlaceholderFormat(sq.Dollar)
@@ -84,10 +86,10 @@ func (m *UserModel) Get(id int) (*User, error) {
 	}
 
 	var user User
-	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(&user.ID, &user.Email, &user.Name)
+	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("user not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
 		}
 
 		// For other errors
@@ -101,7 +103,7 @@ func (m *UserModel) GetUserByEmail(email string) (*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
-	query := sq.Select("*").
+	query := sq.Select("id, email, name, created_at").
 		From("users").
 		Where(sq.Eq{"email": email}).
 		PlaceholderFormat(sq.Dollar)
@@ -112,10 +114,10 @@ func (m *UserModel) GetUserByEmail(email string) (*User, error) {
 	}
 
 	var user User
-	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(&user.ID, &user.Email, &user.Name)
+	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("user not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
 		}
 
 		// For other errors
@@ -125,7 +127,7 @@ func (m *UserModel) GetUserByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
-func (m *UserModel) Update(id int, user *UpdateUserDto) error {
+func (m *UserModel) Update(id int, user *UpdateUserDto) (*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -141,19 +143,30 @@ func (m *UserModel) Update(id int, user *UpdateUserDto) error {
 		query = query.Set("password", user.Password)
 	}
 
-	query = query.Where(sq.Eq{"id": id})
+	query = query.Where(sq.Eq{"id": id}).Suffix("RETURNING id, email, name, created_at, updated_at")
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("no fields to update")
+		return nil, fmt.Errorf("no fields to update")
 	}
 
-	_, err = m.DB.ExecContext(ctx, sqlStr, args...)
-	return err
+	var updated User
+	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(
+		&updated.ID,
+		&updated.Email,
+		&updated.Name,
+		&updated.CreatedAt,
+		&updated.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &updated, nil
 }
 
 func (m *UserModel) Delete(id int) error {

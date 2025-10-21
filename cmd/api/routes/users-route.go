@@ -7,11 +7,11 @@ import (
 )
 
 func setupAuthControllers(router *gin.RouterGroup, app *app.Application) {
-	r := router.Group("/auth")
+	r := router.Group("/auth/users")
 
 	r.POST("/", services.RegisterUser(app))
-	r.GET("/", services.GetAllEvent(app))
-	r.GET("/:id", services.GetEvent(app))
-	r.PUT("/:id", services.UpdateEvent(app))
-	r.DELETE("/:id", services.DeleteEvent(app))
+	r.GET("/", services.GetAllUsers(app))
+	r.GET("/:id", services.GetUser(app))
+	r.PUT("/:id", services.UpdateUser(app))
+	r.DELETE("/:id", services.DeleteUser(app))
 }

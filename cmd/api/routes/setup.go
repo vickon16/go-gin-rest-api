@@ -63,5 +63,8 @@ func SetupRoutes(app *app.Application) http.Handler {
 	// Events
 	setupEventsControllers(v1, app)
 
+	// Attendees
+	setupAttendeesControllers(v1, app)
+
 	return g
 }

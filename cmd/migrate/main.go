@@ -55,6 +55,9 @@ func main() {
 
 }
 
+// Run this when using postgres
+// migrate -path ./cmd/migrate/migrations -database "postgres://postgres:Password123!@localhost:5432/go-gin-tutorial?sslmode=disable" up
+
 // Run
 // migrate create -ext sql -dir ./cmd/migrate/migrations -seq create-users-table
 // Create the migration sql commands
