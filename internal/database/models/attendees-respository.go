@@ -33,8 +33,14 @@ func (m *AttendeesModel) GetAll() ([]*Attendee, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
-	query := sq.Select("id", "user_id", "event_id", "created_at").
-		From("attendees").
+	query := sq.Select(
+		"a.id", "a.user_id", "a.event_id", "a.created_at",
+		"u.id", "u.name", "u.email, u.created_at",
+		"e.id", "e.user_id", "e.name", "e.description", "e.date", "e.location", "e.created_at",
+	).
+		From("attendees a").
+		LeftJoin("users u ON a.user_id = u.id").
+		LeftJoin("events e ON a.event_id = e.id").
 		PlaceholderFormat(sq.Dollar)
 
 	sqlStr, args, err := query.ToSql()
@@ -54,8 +60,14 @@ func (m *AttendeesModel) GetAll() ([]*Attendee, error) {
 
 	for rows.Next() {
 		var attendee Attendee
+		attendee.User = &User{}
+		attendee.Event = &Event{}
 
-		if err := rows.Scan(&attendee.ID, &attendee.UserID, &attendee.EventID, &attendee.CreatedAt); err != nil {
+		if err := rows.Scan(&attendee.ID, &attendee.UserID, &attendee.EventID, &attendee.CreatedAt,
+			&attendee.User.ID, &attendee.User.Name, &attendee.User.Email, &attendee.User.CreatedAt,
+			&attendee.Event.ID, &attendee.Event.UserID, &attendee.Event.Name, &attendee.Event.Description,
+			&attendee.Event.Date, &attendee.Event.Location, &attendee.Event.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 
@@ -69,16 +81,18 @@ func (m *AttendeesModel) GetAll() ([]*Attendee, error) {
 	return attendees, nil
 }
 
-func (m *AttendeesModel) Get(id int) (*Attendee, error) {
+func (m *AttendeesModel) Get(id int64) (*Attendee, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
 	query := sq.Select(
 		"a.id", "a.user_id", "a.event_id", "a.created_at",
-		// "u.id", "u.name", "u.email",
+		"u.id", "u.name", "u.email", "u.created_at",
+		"e.id", "e.user_id", "e.name", "e.description", "e.date", "e.location", "e.created_at",
 	).
 		From("attendees a").
-		// LeftJoin("users u ON a.user_id = u.id").
+		LeftJoin("users u ON a.user_id = u.id").
+		LeftJoin("events e ON a.event_id = e.id").
 		Where(sq.Eq{"a.id": id}).
 		PlaceholderFormat(sq.Dollar)
 
@@ -89,8 +103,12 @@ func (m *AttendeesModel) Get(id int) (*Attendee, error) {
 
 	var attendee Attendee
 	attendee.User = &User{}
+	attendee.Event = &Event{}
 
-	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(&attendee.ID, &attendee.UserID, &attendee.EventID, &attendee.CreatedAt)
+	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(
+		&attendee.ID, &attendee.UserID, &attendee.EventID, &attendee.CreatedAt,
+		&attendee.User.ID, &attendee.User.Name, &attendee.User.Email, &attendee.User.CreatedAt,
+		&attendee.Event.ID, &attendee.Event.UserID, &attendee.Event.Name, &attendee.Event.Description, &attendee.Event.Date, &attendee.Event.Location, &attendee.Event.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -103,7 +121,7 @@ func (m *AttendeesModel) Get(id int) (*Attendee, error) {
 	return &attendee, nil
 }
 
-func (m *AttendeesModel) Update(id int, attendee *UpdateAttendeeDto) (*Attendee, error) {
+func (m *AttendeesModel) Update(id int64, attendee *UpdateAttendeeDto) (*Attendee, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -141,12 +159,33 @@ func (m *AttendeesModel) Update(id int, attendee *UpdateAttendeeDto) (*Attendee,
 	return &updated, nil
 }
 
-func (m *AttendeesModel) Delete(id int) error {
+func (m *AttendeesModel) Delete(id int64) error {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
 	query := sq.Delete("attendees").
 		Where(sq.Eq{"id": id}).
+		PlaceholderFormat(sq.Dollar)
+
+	sqlStr, args, err := query.ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = m.DB.ExecContext(ctx, sqlStr, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *AttendeesModel) DeleteByIdAndEventId(eventId, userId int64) error {
+	ctx, cancel := utils.CreateContext()
+	defer cancel()
+
+	query := sq.Delete("attendees").
+		Where(sq.Eq{"event_id": eventId, "user_id": userId}).
 		PlaceholderFormat(sq.Dollar)
 
 	sqlStr, args, err := query.ToSql()

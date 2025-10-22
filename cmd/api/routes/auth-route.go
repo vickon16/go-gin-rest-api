@@ -1,0 +1,14 @@
+package routes
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/vickon16/go-gin-rest-api/cmd/api/services"
+	"github.com/vickon16/go-gin-rest-api/internal/app"
+)
+
+func setupAuthControllers(router *gin.RouterGroup, app *app.Application) {
+	r := router.Group("/auth")
+
+	r.POST("/register", services.RegisterUser(app))
+	r.POST("/login", services.LoginUser(app))
+}

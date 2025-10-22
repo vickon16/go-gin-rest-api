@@ -2,16 +2,19 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/vickon16/go-gin-rest-api/cmd/api/middlewares"
 	"github.com/vickon16/go-gin-rest-api/cmd/api/services"
 	"github.com/vickon16/go-gin-rest-api/internal/app"
 )
 
-func setupAuthControllers(router *gin.RouterGroup, app *app.Application) {
-	r := router.Group("/auth/users")
+func setupUserControllers(router *gin.RouterGroup, app *app.Application) {
 
-	r.POST("/", services.RegisterUser(app))
-	r.GET("/", services.GetAllUsers(app))
-	r.GET("/:id", services.GetUser(app))
-	r.PUT("/:id", services.UpdateUser(app))
-	r.DELETE("/:id", services.DeleteUser(app))
+	// Private routes
+	priv := router.Group("/users", middlewares.AuthMiddleware(app))
+
+	priv.GET("/", services.GetAllUsers(app))
+	priv.GET("/:id", services.GetUser(app))
+	priv.GET("/me", services.GetMe(app))
+	priv.PUT("/:id", services.UpdateUser(app))
+	priv.DELETE("/:id", services.DeleteUser(app))
 }

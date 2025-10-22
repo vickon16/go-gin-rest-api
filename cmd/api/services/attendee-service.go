@@ -13,20 +13,33 @@ import (
 
 func CreateAttendee(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var attendee models.Attendee
+		var attendee models.CreateAttendeeDto
 
 		if err := c.ShouldBindJSON(&attendee); err != nil {
 			utils.ErrorResponse(c, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if err := app.Models.Attendees.Insert(&attendee); err != nil {
+		event, user, err := FindEventAndUser(app, attendee.EventID, attendee.UserID)
+		if err != nil {
+			utils.ErrorResponse(c, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		newAttendee := models.Attendee{
+			UserID:  attendee.UserID,
+			EventID: attendee.EventID,
+			User:    user,
+			Event:   event,
+		}
+
+		if err := app.Models.Attendees.Insert(&newAttendee); err != nil {
 			log.Printf("Error inserting attendee: %v", err)
 			utils.ErrorResponse(c, "Failed to create attendee", http.StatusInternalServerError)
 			return
 		}
 
-		utils.SuccessResponse(c, "Attendee Created successfully", models.CreateResponseAttendee(&attendee), http.StatusCreated)
+		utils.SuccessResponse(c, "Attendee Created successfully", models.CreateResponseAttendee(&newAttendee), http.StatusCreated)
 	}
 }
 
@@ -53,9 +66,31 @@ func GetAllAttendees(app *app.Application) gin.HandlerFunc {
 	}
 }
 
-func GetEventsForAttendee(app *app.Application) gin.HandlerFunc {
+func GetAttendee(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		attendeeId, err := strconv.Atoi(c.Param("id"))
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			utils.ErrorResponse(c, "Invalid attendee Id", http.StatusBadRequest)
+			return
+		}
+
+		attendee, err := app.Models.Attendees.Get(id)
+		if err != nil {
+			utils.ErrorResponse(c, "Failed to get attendee", http.StatusInternalServerError)
+			return
+		}
+		if attendee == nil {
+			utils.ErrorResponse(c, "Attendee does not exist", http.StatusConflict)
+			return
+		}
+
+		utils.SuccessResponse(c, "Successfully retrieved attendee", models.CreateResponseAttendee(attendee))
+	}
+}
+
+func GetEventsByAttendee(app *app.Application) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		attendeeId, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid attendee Id", http.StatusBadRequest)
 			return
@@ -81,31 +116,9 @@ func GetEventsForAttendee(app *app.Application) gin.HandlerFunc {
 	}
 }
 
-func GetAttendee(app *app.Application) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			utils.ErrorResponse(c, "Invalid attendee Id", http.StatusBadRequest)
-			return
-		}
-
-		attendee, err := app.Models.Attendees.Get(id)
-		if err != nil {
-			utils.ErrorResponse(c, "Failed to get attendee", http.StatusInternalServerError)
-			return
-		}
-		if attendee == nil {
-			utils.ErrorResponse(c, "Attendee does not exist", http.StatusConflict)
-			return
-		}
-
-		utils.SuccessResponse(c, "Successfully retrieved attendee", models.CreateResponseAttendee(attendee))
-	}
-}
-
 func UpdateAttendee(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid attendee Id", http.StatusBadRequest)
 			return
@@ -140,9 +153,19 @@ func UpdateAttendee(app *app.Application) gin.HandlerFunc {
 
 func DeleteAttendee(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid attendee Id", http.StatusBadRequest)
+			return
+		}
+
+		attendee, err := app.Models.Attendees.Get(id)
+		if err != nil {
+			utils.ErrorResponse(c, "Failed to get attendee", http.StatusInternalServerError)
+			return
+		}
+		if attendee == nil {
+			utils.ErrorResponse(c, "Attendee does not exist", http.StatusBadRequest)
 			return
 		}
 

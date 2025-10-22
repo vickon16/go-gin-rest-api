@@ -4,33 +4,53 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vickon16/go-gin-rest-api/cmd/api/middlewares"
 	"github.com/vickon16/go-gin-rest-api/internal/app"
 	"github.com/vickon16/go-gin-rest-api/internal/database/models"
 	"github.com/vickon16/go-gin-rest-api/internal/utils"
 )
 
+// @Summary Create events
+// @Description Create an event
+// @Tags Events
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.UserSerializer
+// @Failure 500 {object} utils.ApiResponse
+// @Router /api/v1/events [post]
 func CreateEvent(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var event models.Event
+		var event models.CreateEventDto
 
 		if err := c.ShouldBindJSON(&event); err != nil {
 			utils.ErrorResponse(c, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if err := app.Models.Events.Insert(&event); err != nil {
+		contextUser := middlewares.GetUserFromContext(c)
+		event.UserID = contextUser.ID
+
+		newEvent, err := app.Models.Events.Insert(&event)
+		if err != nil {
 			log.Printf("Error inserting event: %v", err)
 			utils.ErrorResponse(c, "Failed to create event", http.StatusInternalServerError)
 			return
 		}
 
-		utils.SuccessResponse(c, "Event Created successfully", models.CreateResponseEvent(&event), http.StatusCreated)
+		utils.SuccessResponse(c, "Event Created successfully", models.CreateResponseEvent(newEvent), http.StatusCreated)
 	}
 }
 
+// @Summary Get all events
+// @Description Retrieves all events from the database
+// @Tags Events
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.UserSerializer
+// @Failure 500 {object} utils.ApiResponse
+// @Router /api/v1/events [get]
 func GetAllEvent(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -56,7 +76,7 @@ func GetAllEvent(app *app.Application) gin.HandlerFunc {
 
 func GetEvent(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid event Id", http.StatusBadRequest)
 			return
@@ -68,7 +88,7 @@ func GetEvent(app *app.Application) gin.HandlerFunc {
 			return
 		}
 		if event == nil {
-			utils.ErrorResponse(c, "Event does not exist", http.StatusConflict)
+			utils.ErrorResponse(c, "Event does not exist", http.StatusBadRequest)
 			return
 		}
 
@@ -78,55 +98,31 @@ func GetEvent(app *app.Application) gin.HandlerFunc {
 
 func AddAttendeeToEvent(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		eventId, err := strconv.Atoi(c.Param("id"))
+		eventId, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid event Id", http.StatusBadRequest)
 			return
 		}
-		userId, err := strconv.Atoi(c.Param("userId"))
+		userId, err := strconv.ParseInt(c.Param("userId"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid event Id", http.StatusBadRequest)
 			return
 		}
 
-		var (
-			event             *models.Event
-			userToAdd         *models.User
-			eventErr, userErr error
-		)
-
-		var wg sync.WaitGroup
-		wg.Add(2)
-
-		// Run event fetch in a goroutine
-		go func() {
-			defer wg.Done()
-			event, eventErr = app.Models.Events.Get(eventId)
-		}()
-
-		// Run user fetch in a goroutine
-		go func() {
-			defer wg.Done()
-			userToAdd, userErr = app.Models.Users.Get(userId)
-		}()
-
-		// Wait for both to finish
-		wg.Wait()
-
-		// Handle errors after both requests complete
-		if eventErr != nil {
-			log.Printf("Error getting event: %v", eventErr)
-			utils.ErrorResponse(c, "Failed to get event", http.StatusNotFound)
+		event, user, err := FindEventAndUser(app, eventId, userId)
+		if err != nil {
+			utils.ErrorResponse(c, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if userErr != nil {
-			log.Printf("Error getting user: %v", userErr)
-			utils.ErrorResponse(c, "Failed to get user", http.StatusNotFound)
+
+		contextUser := middlewares.GetUserFromContext(c)
+		if event.UserID != contextUser.ID {
+			utils.ErrorResponse(c, "You are not authorized to add an attendee to this event", http.StatusForbidden)
 			return
 		}
 
 		// Check if the user is not already an attendee
-		existingAttendee, err := app.Models.Attendees.GetByEventAndAttendee(event.ID, userToAdd.ID)
+		existingAttendee, err := app.Models.Attendees.GetByEventAndAttendee(event.ID, user.ID)
 		if err != nil {
 			utils.ErrorResponse(c, "Failed to get events by attendee", http.StatusConflict)
 			return
@@ -143,7 +139,7 @@ func AddAttendeeToEvent(app *app.Application) gin.HandlerFunc {
 
 		err = app.Models.Attendees.Insert(&attendee)
 		if err != nil {
-			log.Printf("Error adding attendee: %v", userErr)
+			log.Printf("Error adding attendee: %v", err)
 			utils.ErrorResponse(c, "Failed to add attendee to event", http.StatusConflict)
 			return
 		}
@@ -178,7 +174,7 @@ func GetAttendeesForEvent(app *app.Application) gin.HandlerFunc {
 
 func UpdateEvent(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid event Id", http.StatusBadRequest)
 			return
@@ -192,6 +188,13 @@ func UpdateEvent(app *app.Application) gin.HandlerFunc {
 		}
 		if existingEvent == nil {
 			utils.ErrorResponse(c, "No event found", http.StatusNotFound)
+			return
+		}
+
+		contextUser := middlewares.GetUserFromContext(c)
+
+		if existingEvent.UserID != contextUser.ID {
+			utils.ErrorResponse(c, "You are not authorized to update this event", http.StatusForbidden)
 			return
 		}
 
@@ -213,9 +216,25 @@ func UpdateEvent(app *app.Application) gin.HandlerFunc {
 
 func DeleteEvent(app *app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 		if err != nil {
 			utils.ErrorResponse(c, "Invalid event Id", http.StatusBadRequest)
+			return
+		}
+
+		event, err := app.Models.Events.Get(id)
+		if err != nil {
+			utils.ErrorResponse(c, "Failed to get event", http.StatusInternalServerError)
+			return
+		}
+		if event == nil {
+			utils.ErrorResponse(c, "Event does not exist", http.StatusBadRequest)
+			return
+		}
+
+		contextUser := middlewares.GetUserFromContext(c)
+		if event.UserID != contextUser.ID {
+			utils.ErrorResponse(c, "You are not authorized to delete this event", http.StatusForbidden)
 			return
 		}
 
@@ -225,5 +244,40 @@ func DeleteEvent(app *app.Application) gin.HandlerFunc {
 		}
 
 		utils.SuccessResponse(c, "Successfully deleted event", nil)
+	}
+}
+
+func DeleteAttendeeFromEvent(app *app.Application) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		eventId, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			utils.ErrorResponse(c, "Invalid event Id", http.StatusBadRequest)
+			return
+		}
+
+		userId, err := strconv.ParseInt(c.Param("userId"), 10, 64)
+		if err != nil {
+			utils.ErrorResponse(c, "Invalid user Id", http.StatusBadRequest)
+			return
+		}
+
+		event, user, err := FindEventAndUser(app, eventId, userId)
+		if err != nil {
+			utils.ErrorResponse(c, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		contextUser := middlewares.GetUserFromContext(c)
+		if event.UserID != contextUser.ID {
+			utils.ErrorResponse(c, "You are not authorized to delete an attendee from this event", http.StatusForbidden)
+			return
+		}
+
+		if err := app.Models.Attendees.DeleteByIdAndEventId(event.ID, user.ID); err != nil {
+			utils.ErrorResponse(c, "Failed to delete attendee from event", http.StatusInternalServerError)
+			return
+		}
+
+		utils.SuccessResponse(c, "Successfully deleted attendee from event", nil)
 	}
 }

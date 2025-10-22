@@ -5,7 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/vickon16/go-gin-rest-api/internal/app"
+	"github.com/vickon16/go-gin-rest-api/internal/env"
 	"github.com/vickon16/go-gin-rest-api/internal/utils"
 )
 
@@ -60,11 +63,27 @@ func SetupRoutes(app *app.Application) http.Handler {
 	// Auth
 	setupAuthControllers(v1, app)
 
+	// User
+	setupUserControllers(v1, app)
+
 	// Events
 	setupEventsControllers(v1, app)
 
 	// Attendees
 	setupAttendeesControllers(v1, app)
+
+	// for swagger docs
+	g.GET("/swagger/*any", func(c *gin.Context) {
+		if c.Request.RequestURI == "/swagger/" {
+			c.Redirect(302, "/swagger/index.html")
+		}
+
+		apiUrl := env.GetEnvString("API_URL", "http://localhost:8080")
+		swaggerUrl := apiUrl + "/swagger/doc.json"
+
+		ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL(swaggerUrl))(c)
+		// run 'swag init --dir cmd/api --parseDependency --parseInternal --parseDepth 1' to generate docs
+	})
 
 	return g
 }

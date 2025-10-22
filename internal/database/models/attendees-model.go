@@ -14,8 +14,13 @@ type Attendee struct {
 	EventID int64 `db:"event_id" json:"eventId" binding:"required"`
 	BaseModel
 
-	User  *User
-	Event *Event
+	User  *User  `json:"user,omitempty"`
+	Event *Event `json:"event,omitempty"`
+}
+
+type CreateAttendeeDto struct {
+	UserID  int64 `json:"userId" binding:"required"`
+	EventID int64 `json:"eventId" binding:"required"`
 }
 
 type UpdateAttendeeDto struct {
@@ -30,19 +35,28 @@ type AttendeeSerializer struct {
 	BaseModel
 
 	// Joins
-	User  UserSerializer  `json:"user"`
-	Event EventSerializer `json:"event"`
+	User  *UserSerializer  `json:"user,omitempty"`
+	Event *EventSerializer `json:"event,omitempty"`
 }
 
 func CreateResponseAttendee(attendee *Attendee) AttendeeSerializer {
-	return AttendeeSerializer{
+
+	response := AttendeeSerializer{
 		ID:        attendee.ID,
 		UserID:    attendee.UserID,
 		EventID:   attendee.EventID,
 		BaseModel: BaseModel{CreatedAt: attendee.CreatedAt, UpdatedAt: attendee.UpdatedAt},
-
-		// Joins
-		User:  CreateResponseUser(attendee.User),
-		Event: CreateResponseEvent(attendee.Event),
 	}
+
+	if attendee.User != nil {
+		userResponse := CreateResponseUser(attendee.User)
+		response.User = &userResponse
+	}
+
+	if attendee.Event != nil {
+		eventResponse := CreateResponseEvent(attendee.Event)
+		response.Event = &eventResponse
+	}
+
+	return response
 }

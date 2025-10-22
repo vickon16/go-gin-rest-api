@@ -9,7 +9,7 @@ import (
 	"github.com/vickon16/go-gin-rest-api/internal/utils"
 )
 
-func (m *EventModel) Insert(event *Event) error {
+func (m *EventModel) Insert(event *CreateEventDto) (*Event, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -21,20 +21,30 @@ func (m *EventModel) Insert(event *Event) error {
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Scan the returned row
-	return m.DB.QueryRowContext(ctx, sqlStr, args...).
-		Scan(&event.ID, &event.UserID, &event.Name, &event.Description, &event.Date, &event.Location, &event.CreatedAt)
+	var newEvent Event
+	err = m.DB.QueryRowContext(ctx, sqlStr, args...).
+		Scan(&newEvent.ID, &newEvent.UserID, &newEvent.Name, &newEvent.Description, &newEvent.Date, &newEvent.Location, &newEvent.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &newEvent, nil
 }
 
 func (m *EventModel) GetAll() ([]*Event, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
-	query := sq.Select("id", "user_id", "name", "description", "date", "location", "created_at").
-		From("events").
+	query := sq.Select(
+		"e.id", "e.user_id", "e.name", "e.description", "e.date", "e.location", "e.created_at",
+		"u.id", "u.name", "u.email",
+	).
+		From("events e").
+		LeftJoin("users u ON e.user_id = u.id").
 		PlaceholderFormat(sq.Dollar)
 
 	sqlStr, args, err := query.ToSql()
@@ -54,8 +64,9 @@ func (m *EventModel) GetAll() ([]*Event, error) {
 
 	for rows.Next() {
 		var event Event
+		event.User = &User{}
 
-		if err := rows.Scan(&event.ID, &event.UserID, &event.Name, &event.Description, &event.Date, &event.Location, &event.CreatedAt); err != nil {
+		if err := rows.Scan(&event.ID, &event.UserID, &event.Name, &event.Description, &event.Date, &event.Location, &event.CreatedAt, &event.User.ID, &event.User.Name, &event.User.Email); err != nil {
 			return nil, err
 		}
 
@@ -69,7 +80,7 @@ func (m *EventModel) GetAll() ([]*Event, error) {
 	return events, nil
 }
 
-func (m *EventModel) Get(id int) (*Event, error) {
+func (m *EventModel) Get(id int64) (*Event, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -103,7 +114,7 @@ func (m *EventModel) Get(id int) (*Event, error) {
 	return &event, nil
 }
 
-func (m *EventModel) GetEventsByAttendeeId(attendeeId int) ([]*Event, error) {
+func (m *EventModel) GetEventsByAttendeeId(attendeeId int64) ([]*Event, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -150,7 +161,7 @@ func (m *EventModel) GetEventsByAttendeeId(attendeeId int) ([]*Event, error) {
 	return events, nil
 }
 
-func (m *EventModel) Update(id int, event *UpdateEventDto) (*Event, error) {
+func (m *EventModel) Update(id int64, event *UpdateEventDto) (*Event, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -198,7 +209,7 @@ func (m *EventModel) Update(id int, event *UpdateEventDto) (*Event, error) {
 	return &updated, nil
 }
 
-func (m *EventModel) Delete(id int) error {
+func (m *EventModel) Delete(id int64) error {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 

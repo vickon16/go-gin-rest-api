@@ -71,7 +71,7 @@ func (m *UserModel) GetAll() ([]*User, error) {
 	return users, nil
 }
 
-func (m *UserModel) Get(id int) (*User, error) {
+func (m *UserModel) Get(id int64) (*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -99,11 +99,22 @@ func (m *UserModel) Get(id int) (*User, error) {
 	return &user, nil
 }
 
-func (m *UserModel) GetUserByEmail(email string) (*User, error) {
+func (m *UserModel) GetUserByEmail(email string, withPassword ...bool) (*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
-	query := sq.Select("id, email, name, created_at").
+	includePassword := false
+	if len(withPassword) > 0 && withPassword[0] {
+		includePassword = true
+	}
+
+	// Define base columns
+	columns := []string{"id", "email", "name", "created_at"}
+	if includePassword {
+		columns = append(columns, "password")
+	}
+
+	query := sq.Select(columns...).
 		From("users").
 		Where(sq.Eq{"email": email}).
 		PlaceholderFormat(sq.Dollar)
@@ -114,7 +125,17 @@ func (m *UserModel) GetUserByEmail(email string) (*User, error) {
 	}
 
 	var user User
-	err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt)
+	if includePassword {
+		err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(
+			&user.ID, &user.Email, &user.Name,
+			&user.CreatedAt, &user.Password,
+		)
+	} else {
+		err = m.DB.QueryRowContext(ctx, sqlStr, args...).Scan(
+			&user.ID, &user.Email, &user.Name, &user.CreatedAt,
+		)
+	}
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -123,11 +144,10 @@ func (m *UserModel) GetUserByEmail(email string) (*User, error) {
 		// For other errors
 		return nil, err
 	}
-
 	return &user, nil
 }
 
-func (m *UserModel) Update(id int, user *UpdateUserDto) (*User, error) {
+func (m *UserModel) Update(id int64, user *UpdateUserDto) (*User, error) {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 
@@ -169,7 +189,7 @@ func (m *UserModel) Update(id int, user *UpdateUserDto) (*User, error) {
 	return &updated, nil
 }
 
-func (m *UserModel) Delete(id int) error {
+func (m *UserModel) Delete(id int64) error {
 	ctx, cancel := utils.CreateContext()
 	defer cancel()
 

@@ -1,0 +1,55 @@
+basePath: /api/v1
+definitions:
+  models.UserSerializer:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+info:
+  contact:
+    email: vicy@victorcyril.com
+    name: Victor Cyril
+    url: https://victorcyril.com
+  description: A rest API in Go using Gin Framework
+  termsOfService: http://example.com/terms/
+  title: Go Gin Rest API
+  version: "1.0"
+paths:
+  /api/v1/events:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all events from the database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UserSerializer'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all events
+      tags:
+      - Events
+securityDefinitions:
+  BearerAuth:
+    description: Enter you bearer token in the format **Bearer &lt;token&gt;**
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

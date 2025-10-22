@@ -12,9 +12,27 @@ import (
 	"github.com/vickon16/go-gin-rest-api/internal/database"
 	"github.com/vickon16/go-gin-rest-api/internal/database/models"
 	"github.com/vickon16/go-gin-rest-api/internal/env"
+	"github.com/vickon16/go-gin-rest-api/internal/redisDb"
 
 	_ "github.com/lib/pq"
+	_ "github.com/vickon16/go-gin-rest-api/docs"
 )
+
+// @title Go Gin Rest API
+// @version 1.0
+// @description A rest API in Go using Gin Framework
+// @termsOfService  http://example.com/terms/
+
+// @contact.name   Victor Cyril
+// @contact.url    https://victorcyril.com
+// @contact.email  vicy@victorcyril.com
+
+// @BasePath  /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter you bearer token in the format **Bearer &lt;token&gt;**
 
 func main() {
 	_ = godotenv.Load()
@@ -23,10 +41,12 @@ func main() {
 	defer db.Close()
 
 	models := models.NewModels(db)
+	redisClient := redisDb.NewRedisClient()
+
 	app := &app.Application{
-		Port:      env.GetEnvInt("PORT", 8080),
-		JWTSecret: env.GetEnvString("JWT_SECRET", "some-secret-123456"),
-		Models:    models,
+		Port:   env.GetEnvInt("PORT", 8080),
+		Models: models,
+		Redis:  redisClient,
 	}
 
 	server := &http.Server{

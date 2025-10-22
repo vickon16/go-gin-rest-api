@@ -16,12 +16,6 @@ type User struct {
 	BaseModel
 }
 
-type RegisterUserDto struct {
-	Email    string `json:"email" binding:"required,email"`
-	Name     string `json:"name" binding:"required,min=3"`
-	Password string `json:"password" binding:"required,min=6,max=64"`
-}
-
 type UpdateUserDto struct {
 	Email    string `json:"email,omitempty" binding:"omitempty,email"`
 	Name     string `json:"name,omitempty" binding:"omitempty,min=3"`

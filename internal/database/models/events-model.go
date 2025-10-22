@@ -19,7 +19,15 @@ type Event struct {
 	BaseModel
 
 	// Joins
-	User *User
+	User *User `json:"user,omitempty"`
+}
+
+type CreateEventDto struct {
+	UserID      int64     `json:"userId,omitempty"`
+	Name        string    `json:"name,omitempty" binding:"required,min=3,max=255"`
+	Description string    `json:"description,omitempty" binding:"required,min=5"`
+	Date        time.Time `json:"date,omitempty" binding:"required"`
+	Location    string    `json:"location,omitempty" binding:"required"`
 }
 
 type UpdateEventDto struct {
@@ -40,11 +48,11 @@ type EventSerializer struct {
 	BaseModel
 
 	// Joins
-	User UserSerializer `json:"user"`
+	User *UserSerializer `json:"user,omitempty"`
 }
 
 func CreateResponseEvent(event *Event) EventSerializer {
-	return EventSerializer{
+	response := EventSerializer{
 		ID:          event.ID,
 		UserID:      event.UserID,
 		Name:        event.Name,
@@ -52,8 +60,12 @@ func CreateResponseEvent(event *Event) EventSerializer {
 		Date:        event.Date,
 		Location:    event.Location,
 		BaseModel:   BaseModel{CreatedAt: event.CreatedAt, UpdatedAt: event.UpdatedAt},
-
-		// Joins
-		User: CreateResponseUser(event.User),
 	}
+
+	if event.User != nil {
+		userResponse := CreateResponseUser(event.User)
+		response.User = &userResponse
+	}
+
+	return response
 }
